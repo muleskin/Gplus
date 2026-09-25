@@ -25,6 +25,9 @@ public sealed class Worker(Sweeper sweeper, IOptionsMonitor<GplusOptions> option
                 if (r.Examined > 0)
                     logger.LogInformation("Sweep: {Listed} unread, {Examined} new examined, {Junk} junk, {Removed} removed{Dry}",
                         r.Listed, r.Examined, r.Junk, r.Removed, opt.DryRun ? " (dry run)" : "");
+                if (r.Trained + r.Restored > 0)
+                    logger.LogInformation("Training: {Trained} learned from {Train}, {Restored} restored from {NotJunk}",
+                        r.Trained, opt.TrainLabel, r.Restored, opt.NotJunkLabel);
                 failures = 0;
                 wait = TimeSpan.FromSeconds(Math.Max(30, opt.PollIntervalSeconds));
 

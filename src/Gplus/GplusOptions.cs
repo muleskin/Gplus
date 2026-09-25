@@ -27,6 +27,14 @@ public sealed class GplusOptions
     /// <summary>Label added to every removed message so you can find them: label:Gplus-Removed.</summary>
     public string RemovedLabel { get; set; } = "Gplus-Removed";
 
+    /// <summary>Learn from the two labels below. Put a message in <see cref="TrainLabel"/> to block its
+    /// sender and trash it; put one in <see cref="NotJunkLabel"/> to allow its sender and restore it.</summary>
+    public bool LearnFromLabels { get; set; } = true;
+
+    public string TrainLabel { get; set; } = "Gplus-Train";
+
+    public string NotJunkLabel { get; set; } = "Gplus-NotJunk";
+
     /// <summary>When true the service only logs what it would do.</summary>
     public bool DryRun { get; set; }
 

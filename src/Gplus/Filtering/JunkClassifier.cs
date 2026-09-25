@@ -272,6 +272,8 @@ public sealed partial class JunkClassifier(RuleSet rules)
         return BulkSenderDomains.FirstOrDefault(d => Addresses.DomainMatches(domain, d));
     }
 
+    internal static bool IsBulkPlatform(string domain) => BulkSenderDomains.Any(d => Addresses.DomainMatches(domain, d));
+
     internal static int PreheaderPadding(string rawBody)
     {
         int n = 0;

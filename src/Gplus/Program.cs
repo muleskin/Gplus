@@ -128,6 +128,8 @@ static async Task<int> Scan(string[] a)
     var r = await sweeper.SweepAsync(new SweepOptions(Apply: apply, UseSeen: false, max, query), CancellationToken.None);
     Console.WriteLine();
     Console.WriteLine($"{sweeper.Account}: {r.Examined} examined, {r.Junk} junk{(apply ? $", {r.Removed} removed" : " (preview)")}.");
+    if (r.Trained + r.Restored > 0)
+        Console.WriteLine($"Training: {r.Trained} learned and removed, {r.Restored} restored as not junk (see {AppPaths.Learned}).");
     Console.WriteLine($"Details: {AppPaths.LogDir}\\decisions-{DateTime.Now:yyyy-MM-dd}.tsv");
     return 0;
 }

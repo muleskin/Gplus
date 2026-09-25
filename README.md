@@ -78,6 +78,7 @@ service there (quoted path), starts it, and logs to `%ProgramData%\Gplus\logs\de
 | File | Purpose |
 |---|---|
 | `rules.json` | Your rules. **Edit freely**; the next sweep reloads them, no restart needed. A broken edit is logged and the previous rules keep running. |
+| `learned.json` | Senders learned from the training labels (see below). Delete an entry to undo it. |
 | `appsettings.json` *(optional)* | Overrides for the settings below |
 | `logs\decisions-YYYY-MM-DD.tsv` | One line per judged message. Opens in Excel. |
 | `logs\gplus-YYYY-MM-DD.log` | Service activity |
@@ -94,12 +95,37 @@ service there (quoted path), starts it, and logs to `%ProgramData%\Gplus\logs\de
 | `PollIntervalSeconds` | `300` | |
 | `Query` | `is:unread in:inbox newer_than:30d` | Which mail is considered |
 | `LearnCorrespondents` | `true` | Protect everyone you've emailed |
+| `LearnFromLabels` | `true` | Learn from the `Gplus-Train` and `Gplus-NotJunk` labels |
+| `TrainLabel` / `NotJunkLabel` | `Gplus-Train` / `Gplus-NotJunk` | Names of those labels |
+
+### Teaching Gplus from Gmail
+
+The first sweep creates two labels in Gmail. Use them like folders ("Move to" or "Label as",
+on your phone or the web):
+
+* **`Gplus-Train`**: junk that got through. On the next sweep (within 5 minutes) Gplus blocks the
+  sender and removes the message like any other junk. It then re-checks recent unread mail, so
+  other messages from that sender go too.
+  * Normally it blocks the sender's **whole domain** (for example `deals.somestore.com`).
+  * It blocks **only that one address** when the domain is shared: personal-mail providers
+    (gmail.com, yahoo, outlook, ...), bulk-mail platforms (sendgrid.net, ...), brands in `Brands`
+    (amazon.com, paypal.com, ...), or a domain where someone you've emailed works.
+  * It **learns nothing** from mail sent by you, by someone you've emailed, or by a sender on your
+    `AllowSenders` list. The message is still removed.
+* **`Gplus-NotJunk`**: something that shouldn't have been removed. Label it, even in Trash or
+  Spam. Gplus allows that address, removes any learned block that caught it, and moves the
+  message back to your inbox.
+
+What it learns goes in `learned.json`, never in your hand-edited `rules.json`. Every lesson is
+also written to the decisions log (`Action` starts with `TRAINED` or is `RESTORED`). The labels
+are ignored while `DryRun` is on, and by `scan` without `--apply`.
 
 ### Tuning rules
 
-* **Something slipped through?** Add its domain to `BlockSenders`, or add a pattern to a category.
-* **Something wrongly removed?** Add the sender to `AllowSenders`, or just reply to them once:
-  anyone you've emailed is protected from then on.
+* **Something slipped through?** Put it in `Gplus-Train`, add its domain to `BlockSenders`, or
+  add a pattern to a category.
+* **Something wrongly removed?** Put it in `Gplus-NotJunk`, add the sender to `AllowSenders`, or
+  just reply to them once: anyone you've emailed is protected from then on.
 * Turn a whole category on or off with `"Enabled": true/false`. *Social notifications* is off by default.
 * `Threshold` (default 6) is the overall aggressiveness: lower means more aggressive.
 * Test rules offline: `Gplus.exe test samples.json [rules.json]`. Each sample is

@@ -16,6 +16,7 @@ public static class AppPaths
     public static string TokenDir => Path.Combine(DataDir, "token");
     public static string ClientSecret => Path.Combine(DataDir, "client_secret.json");
     public static string Rules => Path.Combine(DataDir, "rules.json");
+    public static string Learned => Path.Combine(DataDir, "learned.json");
     public static string UserSettings => Path.Combine(DataDir, "appsettings.json");
     public static string Seen => Path.Combine(DataDir, "seen.json");
     public static string Correspondents => Path.Combine(DataDir, "correspondents.json");
