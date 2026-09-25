@@ -1,0 +1,457 @@
+// Gplus junk rules. The live copy is %ProgramData%\Gplus\rules.json - edit that one; the service
+// reloads it automatically on the next sweep (no restart needed).
+//
+// Scoring: every matching signal adds (or subtracts) points. A message whose total reaches
+// "Threshold" is junk. Run "Gplus scan" to see the score and reasons for each unread message.
+//
+// Patterns are case-insensitive .NET regular expressions (in JSON, write \b as \\b).
+// Text is normalized first, so bold/fullwidth Unicode letters, zero-width characters hidden between
+// letters, and accented look-alikes all still match plain "loan".
+{
+  "Threshold": 6,
+
+  // Never touched. "person@x.com", "*@x.com", or a bare domain "x.com" (also covers mail.x.com).
+  // People you have sent email to are learned automatically and don't need listing here.
+  "AllowSenders": [
+    // "mybank.com",
+    // "mom@example.com"
+  ],
+
+  // Always removed (unless also allow-listed).
+  "BlockSenders": [
+    "temu.com",
+    "shein.com",
+    "temuemail.com"
+  ],
+
+  "Signals": {
+    "ListUnsubscribe": 3,
+    "PrecedenceBulk": 1,
+    "BulkMailer": 1,
+    "GmailPromotions": 3,
+    "GmailSocial": 0,
+    "GmailUpdates": 0,
+    "GmailForums": 0,
+    "GmailImportant": -2,
+    "AuthFail": 4,
+    "BrandSpoof": 5,
+    "ReplyToMismatch": 1,
+    "NotAddressedToMe": 1,
+    "NoReplySender": 1,
+    "MarketingSubdomain": 1,
+    "PreheaderPadding": 1,
+    "ShoutySubject": 1,
+    "ManyLinks": 1,
+    "ImageOnly": 1
+  },
+
+  // A sender whose display name IS one of these brands but whose domain is not in the list is
+  // impersonating it (classic phishing: "PayPal <billing@random-site.ru>").
+  "Brands": {
+    "paypal": [ "paypal.com", "paypal.co.uk", "xoom.com" ],
+    "amazon": [ "amazon.com", "amazon.co.uk", "amazon.ca", "amazon.de", "amazonaws.com", "primevideo.com" ],
+    "apple": [ "apple.com", "icloud.com", "itunes.com" ],
+    "icloud": [ "apple.com", "icloud.com" ],
+    "microsoft": [ "microsoft.com", "outlook.com", "live.com", "office.com", "office365.com", "microsoftonline.com", "xbox.com" ],
+    "office 365": [ "microsoft.com", "office.com", "office365.com", "microsoftonline.com" ],
+    "outlook": [ "microsoft.com", "outlook.com", "live.com" ],
+    "google": [ "google.com", "youtube.com", "googlegroups.com" ],
+    "netflix": [ "netflix.com" ],
+    "wells fargo": [ "wellsfargo.com", "wf.com", "wellsfargoemail.com", "wellsfargoadvisors.com" ],
+    "chase": [ "chase.com", "jpmorgan.com", "jpmchase.com" ],
+    "bank of america": [ "bankofamerica.com", "bofa.com", "ml.com" ],
+    "capital one": [ "capitalone.com" ],
+    "citi": [ "citi.com", "citibank.com" ],
+    "american express": [ "americanexpress.com", "aexp.com" ],
+    "usps": [ "usps.com", "usps.gov" ],
+    "fedex": [ "fedex.com" ],
+    "ups": [ "ups.com" ],
+    "dhl": [ "dhl.com", "dhl.de" ],
+    "irs": [ "irs.gov" ],
+    "social security": [ "ssa.gov" ],
+    "geek squad": [ "bestbuy.com", "geeksquad.com" ],
+    "best buy": [ "bestbuy.com" ],
+    "norton": [ "norton.com", "nortonlifelock.com", "gen.com" ],
+    "mcafee": [ "mcafee.com" ],
+    "walmart": [ "walmart.com" ],
+    "costco": [ "costco.com" ],
+    "coinbase": [ "coinbase.com" ],
+    "docusign": [ "docusign.com", "docusign.net" ],
+    "venmo": [ "venmo.com" ],
+    "zelle": [ "zellepay.com", "zelle.com" ]
+  },
+
+  // Categories. SubjectWeight counts once for a hit in the subject or sender name; BodyWeight
+  // counts per distinct body pattern, up to MaxBodyHits; SenderWeight applies when the sending
+  // domain is in SenderDomains. Set "Enabled": false to turn a whole category off.
+  "Categories": [
+    {
+      "Name": "Loans & credit",
+      "SubjectWeight": 5, "BodyWeight": 2, "MaxBodyHits": 3, "SenderWeight": 8,
+      "SenderDomains": [ "lendingtree.com", "personalloans.com", "badcreditloans.com", "cashusa.com", "creditloan.com" ],
+      "Patterns": [
+        "\\bpre-?approv(ed|al)\\b",
+        "\\bpre-?qualif(y|ied|ication)\\b",
+        "\\b(personal|payday|title|installment|business|home equity|signature|emergency) loans?\\b",
+        "\\bloan (offers?|approval|amount|options?|decision|is ready)\\b",
+        "\\bdebt (consolidation|relief|settlement|forgiveness)\\b",
+        "\\bcash advance\\b",
+        "\\b(business|merchant|working capital) (funding|financing|cash)\\b",
+        "\\bfunding (is )?(approved|available|offer|ready)\\b",
+        "\\bapproved for (up to )?\\$[\\d,]+",
+        "\\bget (up to )?\\$[\\d,]+ (fast|today|deposited|in \\d+ hours?)\\b",
+        "\\b(low|lower|0%|zero) (apr|interest)\\b",
+        "\\bheloc\\b",
+        "\\b(reverse mortgage|cash-?out refi)",
+        "\\brefinanc(e|ing) (now|today|your)\\b",
+        "\\b(fix|boost|raise|repair|improve) your credit( score)?\\b",
+        "\\bcredit repair\\b",
+        "\\bbad credit\\b",
+        "\\bno credit check\\b",
+        "\\bsba loan\\b"
+      ]
+    },
+    {
+      "Name": "Marketing",
+      "SubjectWeight": 3, "BodyWeight": 1, "MaxBodyHits": 3,
+      "Subject": [
+        "\\b\\d{1,2}% off\\b",
+        "\\b(flash|mega|huge|big|annual|semi-annual|clearance|warehouse|holiday|labor day|memorial day|black friday|cyber monday|prime day|summer|winter|spring|fall|end of season|friends (and|&) family) sale\\b",
+        "\\bsale (ends|starts|extended|is (on|live|here))\\b",
+        "\\blast chance\\b",
+        "\\b(ends|expires) (tonight|today|soon|at midnight|tomorrow)\\b",
+        "\\blimited[- ]time\\b",
+        "\\bexclusive (offer|deal|access|savings)\\b",
+        "\\bdon'?t miss( out)?\\b",
+        "\\bfree shipping\\b",
+        "\\bpromo( code)?\\b",
+        "\\bcoupons?\\b",
+        "\\bbogo\\b|\\bbuy one,? get one\\b",
+        "\\bshop (now|the sale|our)\\b",
+        "\\bnew arrivals?\\b",
+        "\\bjust (dropped|landed|arrived)\\b",
+        "\\bdoorbusters?\\b",
+        "\\b(save|extra|take) (up to |an extra )?\\$?\\d+%?( off)?\\b",
+        "\\bdeals? of the (day|week)\\b",
+        "\\bspecial (offer|savings|pricing)\\b",
+        "\\bwe miss you\\b|\\bcome back\\b",
+        "\\bact (now|fast)\\b|\\bhurry\\b",
+        "\\b(final|last) (hours?|day|call)\\b",
+        "\\btreat yourself\\b",
+        "\\bgift (guide|ideas)\\b",
+        "\\b(starting|starts) at \\$\\d|\\bonly \\$\\d",
+        "\\bearn (\\d+x )?(points|rewards|cash ?back)\\b",
+        "\\bmembers?[- ]only\\b",
+        "\\bfree trial\\b",
+        "\\bwebinar\\b",
+        "\\bfree\\b.{1,25}\\b(is|are) (yours|waiting|on us)\\b|\\bon the house\\b"
+      ],
+      "Body": [
+        "\\bview (this email|it|this message) (in|on) (your|a|the) (web )?browser\\b",
+        "\\b(manage|update) (your )?(email |subscription |communication )?preferences\\b",
+        "\\byou('re| are) receiving this (email|message)\\b",
+        "\\bshop now\\b",
+        "\\bpromo code\\b",
+        "\\b\\d{1,2}% off\\b",
+        "\\bexclusions apply\\b|\\bwhile supplies last\\b",
+        "\\bfree shipping\\b|\\bships? free\\b",
+        "\\boffer (ends|expires|valid (through|until))\\b",
+        "\\bcannot be combined with\\b|\\bpromotional period\\b|\\bnot valid on (prior|previous) purchases\\b",
+        "\\bunsubscribe\\b"
+      ]
+    },
+    {
+      "Name": "Temu & bargain shopping",
+      "SubjectWeight": 6, "BodyWeight": 2, "MaxBodyHits": 2, "SenderWeight": 10,
+      "SenderDomains": [ "temu.com", "temuemail.com", "shein.com", "aliexpress.com", "aliexpress.us", "alibaba.com", "wish.com", "dhgate.com", "banggood.com",
+                         "lightinthebox.com", "joom.com", "romwe.com", "zaful.com", "patpat.com", "halara.com", "shopcider.com" ],
+      "Patterns": [
+        "\\btemu\\b", "\\bshein\\b", "\\baliexpress\\b", "\\bdhgate\\b",
+        "\\bshop like a billionaire\\b",
+        "\\bspin (the|to) (wheel|win)\\b",
+        "\\bfree gifts?\\b",
+        "\\b(coupon|credit) (bundle|pack)\\b",
+        "\\byour (credits?|rewards?|coupons?|gifts?) (is|are|will) (waiting|about to expire|expir)",
+        "\\b\\$\\d+ (coupon|credit)s? (bundle|pack|waiting)\\b",
+        "\\b(lightning|clearance) deals?\\b",
+        "\\bup to 9\\d% off\\b"
+      ]
+    },
+    {
+      "Name": "Horoscopes & psychics",
+      "SubjectWeight": 6, "BodyWeight": 2, "MaxBodyHits": 3, "SenderWeight": 10,
+      "SenderDomains": [ "horoscope.com", "astrology.com", "cafeastrology.com", "astrostyle.com", "ganeshaspeaks.com", "costarastrology.com",
+                         "kasamba.com", "keen.com", "californiapsychics.com", "purplegarden.co", "psychicsource.com", "asknebula.com", "astrology-zodiac-signs.com" ],
+      "Patterns": [
+        "\\bhoroscopes?\\b",
+        "\\bzodiac\\b",
+        "\\bastrolog(y|er|ers|ical)\\b",
+        "\\btarot\\b",
+        "\\bpsychics?\\b",
+        "\\bnumerolog(y|ist)\\b",
+        "\\bbirth ?chart\\b",
+        "\\bmercury (is )?(in )?retrograde\\b",
+        "\\b(aries|taurus|gemini|cancer|leo|virgo|libra|scorpio|sagittarius|capricorn|aquarius|pisces)\\s+(horoscope|season|daily|weekly|monthly|today|forecast|love|zodiac|woman|man|energy)\\b",
+        "\\b(sun|moon|rising) sign\\b",
+        "\\bspirit guides?\\b",
+        "\\bangel numbers?\\b",
+        "\\bfull moon (ritual|energy|in)\\b|\\bnew moon (ritual|energy|in)\\b",
+        "\\byour (daily|weekly|monthly|free) (reading|forecast|cosmic)\\b",
+        "\\bthe stars (say|reveal|align|have)\\b"
+      ]
+    },
+    {
+      "Name": "Weather reports",
+      "SubjectWeight": 5, "BodyWeight": 1, "MaxBodyHits": 3, "SenderWeight": 8,
+      "SenderDomains": [ "weather.com", "accuweather.com", "weatherbug.com", "wunderground.com", "weather.gov", "noaa.gov", "myradar.com",
+                         "weathernationtv.com", "windy.com", "weatherzone.com.au", "foreca.com" ],
+      "Subject": [
+        "\\bweather\\b",
+        "\\b(today'?s|tomorrow'?s|weekend|weekly|daily|\\d+-day|local|your) forecast\\b",
+        "\\bsevere (weather|thunderstorms?|storms?)\\b",
+        "\\b(tornado|hurricane|flood|flash flood|winter storm|winter weather|blizzard|heat|excessive heat|freeze|frost|wind|fire weather|red flag|ice storm) (watch|warning|advisory|alert)\\b",
+        "\\bheat (wave|index|dome)\\b",
+        "\\bair quality\\b",
+        "\\bpollen (count|forecast|report|alert)\\b",
+        "\\b(rain|snow|storms?|showers?) (chances?|totals|expected|moving|on the way|in the forecast|returns?)\\b",
+        "\\btropical (storm|depression|update)\\b",
+        "\\buv index\\b",
+        "\\bnational weather service\\b",
+        "\\bmeteorolog(ist|y)\\b"
+      ],
+      "Body": [
+        "\\bforecast\\b",
+        "\\b(high|low)s? (near|around|in the) \\d{1,3}\\b",
+        "\\b\\d{1,3}\\s?(\\u00B0|degrees)\\s?f?\\b",
+        "\\bchance of (rain|showers|snow|storms)\\b",
+        "\\bprecipitation\\b",
+        "\\bhumidity\\b"
+      ]
+    },
+    {
+      "Name": "Crime reports",
+      "SubjectWeight": 5, "BodyWeight": 1, "MaxBodyHits": 3, "SenderWeight": 8,
+      "SenderDomains": [ "spotcrime.com", "crimereports.com", "citizen.com", "communitycrimemap.com", "crimemapping.com", "mugshots.com", "arrests.org" ],
+      "Subject": [
+        "\\bcrimes?\\b",
+        "\\bpolice (blotter|report|log|activity|scanner|say|chase|investigat)",
+        "\\bmug ?shots?\\b",
+        "\\bsex offenders?\\b",
+        "\\b(arrest(ed|s)?|charged with|indicted|sentenced)\\b",
+        "\\b(shooting|shot dead|stabbing|stabbed|homicide|murder(ed)?|burglar(y|ies)|robbery|robbed|carjack(ing|ed)|break-?ins?|vandali[sz]m|assault(ed)?|kidnapp?(ed|ing)|manhunt)\\b",
+        "\\bsuspects?\\b",
+        "\\bneighborhood (watch|safety|alert|crime)\\b",
+        "\\b(safety|crime|police) alert\\b",
+        "\\bmost wanted\\b",
+        "\\binmates?\\b|\\bbooking (photos?|report)\\b|\\bjail (roster|log|bookings)\\b",
+        "\\bamber alert\\b"
+      ],
+      "Body": [
+        "\\bpolice\\b",
+        "\\bsheriff'?s? (office|department|deputies)\\b",
+        "\\b(arrested|suspect|charged with|booked into)\\b",
+        "\\b(shooting|stabbing|homicide|burglary|robbery)\\b"
+      ]
+    },
+    {
+      "Name": "Local news digests",
+      "SubjectWeight": 4, "BodyWeight": 1, "MaxBodyHits": 2, "SenderWeight": 7,
+      "SenderDomains": [ "patch.com", "newsbreak.com", "newsbreakapp.com", "smartnews.com" ],
+      "Subject": [
+        "\\bbreaking( news)?\\b",
+        "\\b(morning|evening|afternoon|daily|weekly|weekend|local) (briefing|digest|headlines|roundup|newsletter|update|report)\\b",
+        "\\btop (stories|headlines|news)\\b",
+        "\\bnews (alert|digest|roundup|update)\\b",
+        "\\bwhat'?s happening (in|near|around|this)\\b",
+        "\\bin your (area|neighborhood|community|town)\\b",
+        "\\bjust in\\b"
+      ]
+    },
+    {
+      "Name": "Prizes & giveaways",
+      "SubjectWeight": 5, "BodyWeight": 2, "MaxBodyHits": 3,
+      "Patterns": [
+        "\\byou('ve| have)? (won|been selected|been chosen|are a winner)\\b",
+        "\\bcongratulations\\b.{0,40}\\b(winner|won|selected|prize|reward|chosen)\\b",
+        "\\bclaim (your|now|the)\\b.{0,30}\\b(prize|reward|gift|bonus)\\b",
+        "\\b(sweepstakes|giveaway|jackpot|lottery|raffle)\\b",
+        "\\b(free|complimentary) (iphone|ipad|gift ?card|airpods|samsung|macbook|playstation|reward)\\b",
+        "\\b\\$\\d{2,4} (walmart|amazon|target|costco|kohl'?s|visa|home depot|lowe'?s|cvs|walgreens|kroger|starbucks) (gift ?card|reward|voucher)\\b",
+        "\\b(gift ?card|reward|prize) (is )?(waiting|pending|reserved|unclaimed|on hold)\\b",
+        "\\bconfirm (your )?(shipping|delivery) (address|details) to (receive|claim)\\b",
+        "\\bmystery (box|gift)\\b",
+        "\\b(complete|take) (our|this|a) (short|quick|\\d+-second) survey\\b.{0,40}\\b(reward|gift|\\$)",
+        "\\bloyalty (reward|points) (expir|pending|about)"
+      ]
+    },
+    {
+      "Name": "Insurance, warranty & home offers",
+      "SubjectWeight": 5, "BodyWeight": 1, "MaxBodyHits": 3,
+      "Patterns": [
+        "\\b(extended|vehicle|car|auto) (warranty|service contract|protection plan)\\b",
+        "\\bhome warranty\\b",
+        "\\bwarranty (has |is )?(expir|about to|coverage (is )?ending)",
+        "\\binsurance (quotes?|rates?|savings)\\b",
+        "\\b(whole|term|guaranteed|guaranteed issue|final expense) life (insurance|policy|coverage)\\b",
+        "\\blife insurance (policy|quote|coverage|plan)\\b",
+        "\\bpeace of mind\\b",
+        "\\bsave (up to )?\\$?\\d+.{0,20}\\binsurance\\b",
+        "\\bmedicare (advantage|supplement|plans?|benefits?|open enrollment|part [a-d])\\b",
+        "\\bfinal expense\\b|\\bburial (insurance|policy)\\b",
+        "\\bsolar (panels?|savings|incentives?|rebates?|program)\\b",
+        "\\bwalk-?in (tubs?|showers?)\\b",
+        "\\b(gutter|window|roof|bath|kitchen) (replacement|remodel|guards?)\\b",
+        "\\bhome security (system|offer|deal)\\b",
+        "\\bmedical alert (system|device|pendant)\\b",
+        "\\bhome value (estimate|report)\\b|\\bsell your (home|house) (fast|for cash)\\b|\\bcash offer (for|on) your (home|house)\\b"
+      ]
+    },
+    {
+      "Name": "Miracle health & pills",
+      "SubjectWeight": 5, "BodyWeight": 2, "MaxBodyHits": 3,
+      "Patterns": [
+        "\\bweight[- ]loss\\b|\\blose \\d+ ?(lbs|pounds)\\b",
+        "\\bketo\\b",
+        "\\b(ozempic|wegovy|semaglutide|tirzepatide|mounjaro|glp-?1)\\b",
+        "\\b(viagra|cialis|sildenafil|tadalafil|erectile)\\b",
+        "\\bcbd\\b|\\bgummies\\b",
+        "\\bmiracle (cure|pill|supplement|fruit)\\b",
+        "\\b(belly|body) fat\\b",
+        "\\bblood sugar (hack|trick|secret|breakthrough)\\b",
+        "\\bdoctors? (hate|stunned|shocked|baffled|won'?t tell)\\b",
+        "\\bneuropathy\\b|\\btinnitus\\b|\\bnail fungus\\b",
+        "\\b(this|one) (weird|simple|strange|odd) (trick|ritual|hack)\\b",
+        "\\bmemory loss (trick|secret|fix)\\b|\\bbrain fog\\b",
+        "\\b(testosterone|t-level) boost",
+        "\\bprostate\\b"
+      ]
+    },
+    {
+      "Name": "Crypto & get-rich schemes",
+      "SubjectWeight": 5, "BodyWeight": 2, "MaxBodyHits": 3,
+      "Patterns": [
+        "\\b(bitcoin|btc|crypto(currency|currencies)?|ethereum|altcoins?|meme ?coins?|nfts?|airdrop)\\b",
+        "\\b(stock|penny stock|options|trade) (picks?|alerts?|tips?)\\b",
+        "\\b\\d{2,5}x (returns?|gains?|potential|profits?)\\b",
+        "\\b(passive|guaranteed|daily|residual) income\\b",
+        "\\bget rich\\b|\\bmake \\$[\\d,]+ (a|per) (day|week|month)\\b",
+        "\\binvestment opportunity\\b",
+        "\\b(gold|silver|precious metals?) ira\\b|\\bprecious metals\\b",
+        "\\bretire (early|rich|wealthy)\\b",
+        "\\b(market|dollar) (crash|collapse)\\b",
+        "\\bmoney[- ]making (secret|system|method)\\b",
+        "\\bwealth (secret|blueprint|summit|formula)\\b",
+        "\\bforex\\b|\\btrading (signals?|bot|system|secret)\\b",
+        "\\bbuy (this|these) (stock|stocks|coin) (now|before)\\b"
+      ]
+    },
+    {
+      "Name": "Political fundraising",
+      "SubjectWeight": 4, "BodyWeight": 3, "MaxBodyHits": 2,
+      "Subject": [
+        "\\bchip in\\b",
+        "\\b(donate|contribute|give) (now|today|\\$\\d+)\\b",
+        "\\b(fec|end-of-(month|quarter)|fundraising|midnight) deadline\\b",
+        "\\b(\\d+x|\\d{3}%|triple|double|quadruple|quintuple) match(ed|ing)?\\b",
+        "\\bsign (the|our|this|my) (petition|card|pledge)\\b",
+        "\\b(democrats?|republicans?|gop|dnc|rnc|dccc|nrcc|maga)\\b",
+        "\\b(trump|biden|harris|vance|newsom|desantis|pelosi|schumer|obama|aoc|mcconnell)\\b",
+        "\\b(official )?(\\d{4} )?(voter|member(ship)?) (survey|poll|card)\\b"
+      ],
+      "Body": [
+        "\\bpaid for by\\b",
+        "\\bnot authorized by any candidate\\b",
+        "\\bcontributions? .{0,60}not (tax[- ])?deductible\\b",
+        "\\bchip in\\b"
+      ]
+    },
+    {
+      "Name": "Dating & adult",
+      "SubjectWeight": 6, "BodyWeight": 2, "MaxBodyHits": 2,
+      "Patterns": [
+        "\\b(singles?|lonely|hot|local|horny|mature) (women|men|singles|moms|milfs|girls|ladies)\\b",
+        "\\bhook-?ups?\\b",
+        "\\bdating (site|app|profile|match(es)?)\\b",
+        "\\b(someone|\\d+ (women|men|people|singles)) (viewed|liked|wants? to meet|messaged|winked at) (you|your profile)\\b",
+        "\\bsugar (daddy|baby|mama|momma)\\b",
+        "\\bnaughty\\b|\\bxxx\\b|\\bwebcam girls?\\b|\\bnude\\b"
+      ]
+    },
+    {
+      "Name": "Scams & phishing",
+      "SubjectWeight": 5, "BodyWeight": 2, "MaxBodyHits": 3,
+      "Patterns": [
+        "\\b(your )?(account|mailbox|email|cloud storage|icloud|storage) (is |has been |will be )?(suspended|locked|disabled|full|on hold|deactivated|(deleted|closed|terminated) (today|soon|within))\\b",
+        "\\b(verify|confirm|validate) your (account|identity|mailbox|payment details) (now|immediately|within|to avoid)\\b",
+        "\\b(geek squad|norton|mcafee|paypal|best buy) (invoice|renewal|subscription|order|billing)\\b",
+        "\\bauto-?renew(al|ed)?\\b.{0,40}\\b(call|contact|dispute)\\b",
+        "\\bif you did not (authorize|make|request) this (purchase|transaction|charge),? (please )?(call|contact)\\b",
+        "\\b(call|contact) (us )?(immediately|now|toll[- ]free)\\b",
+        "\\b(wire transfer|gift card|bitcoin) payment\\b",
+        "\\binheritance\\b|\\bnext of kin\\b|\\bbarrister\\b|\\bbeneficiary (fund|claim)\\b",
+        "\\b\\d+(\\.\\d+)? million (usd|us dollars|dollars|euros)\\b",
+        "\\b(unclaimed|pending|frozen) (funds|payment|compensation)\\b",
+        "\\b(package|parcel|shipment) (could not be|couldn'?t be|was not|is on) (delivered|hold)\\b",
+        "\\bdelivery (attempt )?failed\\b|\\bunpaid (toll|customs fee|shipping fee)\\b",
+        "\\bdear (customer|user|member|beneficiary|friend|sir|madam|account holder)\\b",
+        "\\b(final|urgent|last|second|important) (notice|warning|attempt)\\b",
+        "\\b(immediate|urgent) (action|response|attention) (required|needed)\\b",
+        "\\bkindly\\b.{0,30}\\b(click|reply|send|confirm|verify)\\b",
+        "\\b(your )?password (expires|will expire) (today|soon|in \\d+)\\b"
+      ]
+    },
+    {
+      "Name": "Surveys & feedback nags",
+      "SubjectWeight": 3, "BodyWeight": 1, "MaxBodyHits": 1,
+      "Subject": [
+        "\\bhow did we do\\b",
+        "\\brate your (recent )?(experience|visit|purchase|order|stay)\\b",
+        "\\btell us (what you think|how we did|about your)\\b",
+        "\\bwe value your (opinion|feedback)\\b",
+        "\\b(take|quick|short|customer satisfaction|customer) survey\\b",
+        "\\bleave (us )?a review\\b|\\bwrite a review\\b"
+      ]
+    },
+    {
+      // Off by default - turn on if you want social-network notification mail gone too.
+      "Name": "Social notifications",
+      "Enabled": false,
+      "SubjectWeight": 3, "BodyWeight": 0, "SenderWeight": 7,
+      "SenderDomains": [ "facebookmail.com", "linkedin.com", "nextdoor.com", "pinterest.com", "x.com", "twitter.com",
+                         "instagram.com", "quora.com", "tiktok.com", "redditmail.com", "threads.net" ],
+      "Subject": [
+        "\\b(people you may know|you have \\d+ new (notifications?|connections?)|see what you'?ve missed|trending in your network)\\b"
+      ]
+    }
+  ],
+
+  // Subjects of mail people actually need. A match here subtracts points, so a real receipt
+  // or login code survives even from a store that also sends you marketing.
+  "Transactional": {
+    "Weight": -6,
+    "Patterns": [
+      "\\b(verification|security|confirmation|one-?time|login|sign-?in|access|authentication|passcode) code\\b",
+      "\\b(password|passcode) (reset|change|changed|updated)\\b|\\breset your password\\b",
+      "\\byour (order|receipt|invoice|statement|bill|payment|appointment|reservation|booking|itinerary|prescription|refund|return|claim|policy|e-?ticket|tickets)\\b",
+      "\\border (#|no\\.?|number|confirm|confirmation|received|shipped|delivered|update|status)",
+      "\\b(has|have) (shipped|been shipped|been delivered)\\b|\\bout for delivery\\b|\\bwas delivered\\b",
+      "\\b(package|parcel|order|item|shipment)s? (was |were |has been |have been )?(delivered|arriving|arrived)\\b",
+      "\\binsufficient funds\\b|\\b(low|available) balance\\b|\\boverdraft\\b",
+      "\\b(new )?sign-?in (attempt|alert|from|detected)\\b|\\bnew (device|login)\\b",
+      "\\b(2-step|two-factor|2fa|multi-factor)\\b",
+      "\\b(security|account|fraud) alert\\b",
+      "\\bpayment (received|due|scheduled|posted|confirmation|reminder|failed|declined)\\b",
+      "\\b(bill|statement|e-?statement|document|tax form|1099|w-2) (is )?(ready|available|posted)\\b",
+      "\\b(tax (form|document|return))\\b|\\b(1099|w-?2)\\b",
+      "\\bappointment (reminder|confirm|confirmation|scheduled|request)\\b",
+      "\\b(direct )?deposit (received|posted|made)\\b",
+      "\\b(flight|check-?in|boarding pass|gate change)\\b",
+      "\\bcalendar invitation\\b|\\binvitation: .+@",
+      "\\bshared (a|the) (document|file|folder|photo|album)\\b|\\bshared with you\\b",
+      "\\breceipt\\b|\\bpurchase confirmation\\b|\\bthank you for your (payment|purchase|order)\\b",
+      "\\byou (paid|sent|received) .{0,40}\\$\\d",
+      "\\b(quote|quotation|estimate) (for .{1,40} )?is ready\\b",
+      "\\b(service|dispatch|work order|repair) (update|report|scheduled|confirmation)\\b|\\bdispatch #?\\d+"
+    ]
+  }
+}

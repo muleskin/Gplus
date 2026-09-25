@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Gplus</AssemblyName>
+    <RootNamespace>Gplus</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>Gplus Gmail Junk Remover</Product>
+    <ApplicationIcon>Assets\gplus.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Gmail.v1" Version="1.75.0.4225" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gplus.Tests" />
+  </ItemGroup>
+
+  <!-- Defaults are embedded so the published exe is one self-contained file. The loose copies in
+       bin\ exist only for the tests and the Debug build; editable copies live in %ProgramData%\Gplus. -->
+  <ItemGroup>
+    <EmbeddedResource Include="rules.default.json" LogicalName="Gplus.rules.default.json" />
+    <EmbeddedResource Include="appsettings.json" LogicalName="Gplus.appsettings.json" />
+    <Content Update="rules.default.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <Content Remove="appsettings.Development.json" />
+    <None Remove="appsettings.Development.json" />
+  </ItemGroup>
+</Project>
