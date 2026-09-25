@@ -20,6 +20,7 @@ try
         "authorize" or "auth" => await Authorize(rest),
         "scan" => await Scan(rest),
         "test" => Test(rest),
+        "words" => Words(rest),
         "install" => ServiceInstaller.Install(),
         "uninstall" => ServiceInstaller.Uninstall(),
         "start" => ServiceInstaller.Start(),
@@ -130,6 +131,9 @@ static async Task<int> Scan(string[] a)
     Console.WriteLine($"{sweeper.Account}: {r.Examined} examined, {r.Junk} junk{(apply ? $", {r.Removed} removed" : " (preview)")}.");
     if (r.Trained + r.Restored > 0)
         Console.WriteLine($"Training: {r.Trained} learned and removed, {r.Restored} restored as not junk (see {AppPaths.Learned}).");
+    if (r.WordsLearned > 0 || r.WordsActive)
+        Console.WriteLine($"Word filter: {(r.WordsActive ? "scoring" : "still learning")}, {r.WordsSpam} junk / {r.WordsHam} good examples" +
+                          (r.WordsLearned > 0 ? $" ({r.WordsLearned} new)." : "."));
     Console.WriteLine($"Details: {AppPaths.LogDir}\\decisions-{DateTime.Now:yyyy-MM-dd}.tsv");
     return 0;
 }
@@ -165,6 +169,35 @@ static int Test(string[] a)
     return wrong == 0 ? 0 : 3;
 }
 
+/// <summary>What the word filter has learned so far.</summary>
+static int Words(string[] a)
+{
+    int top = Arg(a, "--top") is { } t ? int.Parse(t) : 25;
+    var words = WordFilter.Load(AppPaths.Words);
+    Console.WriteLine($"Word filter ({AppPaths.Words}): {words.SpamCount} junk and {words.HamCount} good examples, {words.TokenCount:N0} words and phrases.");
+    if (words.SpamCount + words.HamCount == 0)
+    {
+        Console.WriteLine("Nothing learned yet; the service gathers examples on each sweep.");
+        return 0;
+    }
+    Print("Most junk-like", words.TopClues(spam: true, top), ConsoleColor.Red);
+    Print("Most good-mail-like", words.TopClues(spam: false, top), ConsoleColor.Green);
+    return 0;
+
+    static void Print(string title, IEnumerable<(string Token, int Spam, int Ham, double F)> rows, ConsoleColor color)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"{title}:              junk  good");
+        foreach (var (token, spam, ham, f) in rows)
+        {
+            Console.ForegroundColor = color;
+            Console.Write($"  {f * 100,3:0}%  ");
+            Console.ResetColor();
+            Console.WriteLine($"{Trim(token, 34),-34} {spam,5} {ham,5}");
+        }
+    }
+}
+
 static int Help(int rc = 0)
 {
     Console.WriteLine("""
@@ -174,6 +207,7 @@ static int Help(int rc = 0)
           Gplus scan [--apply] [--max N] [--query "..."] [--junk-only] [--why]
                                                  Preview (or with --apply, act on) unread inbox mail now
           Gplus test <messages.json> [rules.json] Classify sample messages offline, for tuning rules
+          Gplus words [--top N]                  Show what the word filter has learned
           Gplus install | uninstall | start | stop | status
                                                  Manage the Windows service (elevated prompt)
 

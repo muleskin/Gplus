@@ -28,6 +28,10 @@ public sealed class Worker(Sweeper sweeper, IOptionsMonitor<GplusOptions> option
                 if (r.Trained + r.Restored > 0)
                     logger.LogInformation("Training: {Trained} learned from {Train}, {Restored} restored from {NotJunk}",
                         r.Trained, opt.TrainLabel, r.Restored, opt.NotJunkLabel);
+                if (r.WordsLearned > 0)
+                    logger.LogInformation("Word filter: learned {New} examples; now {Spam} junk / {Ham} good, {State}",
+                        r.WordsLearned, r.WordsSpam, r.WordsHam,
+                        r.WordsActive ? "scoring" : $"starts scoring at {opt.WordFilterMinSpam} / {opt.WordFilterMinHam}");
                 failures = 0;
                 wait = TimeSpan.FromSeconds(Math.Max(30, opt.PollIntervalSeconds));
 

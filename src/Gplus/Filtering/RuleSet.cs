@@ -112,6 +112,12 @@ public sealed class SignalWeights
     public int ManyLinks { get; set; } = 1;
     /// <summary>A body that's mostly an image with almost no text.</summary>
     public int ImageOnly { get; set; } = 1;
+    /// <summary>Word filter is 99%+ sure it's junk.</summary>
+    public int WordsSpam { get; set; } = 5;
+    /// <summary>Word filter says 90–99% junk.</summary>
+    public int WordsLikelySpam { get; set; } = 3;
+    /// <summary>Word filter says 10% or less junk (negative = protective).</summary>
+    public int WordsHam { get; set; } = -3;
 }
 
 public sealed class Category

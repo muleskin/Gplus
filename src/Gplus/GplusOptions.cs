@@ -35,6 +35,24 @@ public sealed class GplusOptions
 
     public string NotJunkLabel { get; set; } = "Gplus-NotJunk";
 
+    /// <summary>Learn words and phrases from junk and good mail, and score new mail with them.</summary>
+    public bool WordFilter { get; set; } = true;
+
+    /// <summary>Junk examples needed before the word filter starts scoring.</summary>
+    public int WordFilterMinSpam { get; set; } = 30;
+
+    /// <summary>Good examples needed before the word filter starts scoring.</summary>
+    public int WordFilterMinHam { get; set; } = 30;
+
+    /// <summary>Examples gathered automatically per sweep (training labels are always learned).</summary>
+    public int WordFilterLearnPerSweep { get; set; } = 40;
+
+    /// <summary>Stop gathering automatic examples for a side once it has this many.</summary>
+    public int WordFilterMaxPerSide { get; set; } = 5000;
+
+    /// <summary>Removed mail counts as confirmed junk once it has sat this many days without being rescued.</summary>
+    public int WordFilterConfirmDays { get; set; } = 2;
+
     /// <summary>When true the service only logs what it would do.</summary>
     public bool DryRun { get; set; }
 

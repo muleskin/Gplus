@@ -3,7 +3,9 @@ using Gplus.Mail;
 
 namespace Gplus.Filtering;
 
-public sealed record Verdict(bool IsJunk, int Score, string Category, string Decision, IReadOnlyList<string> Reasons)
+/// <param name="WordPoints">The part of <paramref name="Score"/> that came from the word filter.</param>
+public sealed record Verdict(bool IsJunk, int Score, string Category, string Decision, IReadOnlyList<string> Reasons,
+    int WordPoints = 0)
 {
     public string ReasonText => string.Join("; ", Reasons);
 }
@@ -28,6 +30,9 @@ public sealed class ClassifyContext
 
     /// <summary>Normalized addresses you've sent mail to. Mail from these is never removed.</summary>
     public IReadOnlySet<string> Correspondents { get; init; } = new HashSet<string>();
+
+    /// <summary>The trained word filter, or null while it has too few examples to trust.</summary>
+    public WordFilter? Words { get; init; }
 }
 
 /// <summary>
@@ -137,13 +142,28 @@ public sealed partial class JunkClassifier(RuleSet rules)
         if (m.LinkCount >= 15) Add(s.ManyLinks, $"{m.LinkCount} links");
         if (m.LinkCount > 0 && body.Length < 120) Add(s.ImageOnly, "image-only body");
 
+        // ---- learned words and phrases -----------------------------------------------------
+        int wordPoints = 0;
+        if (ctx.Words?.Score(m) is { } ws)
+        {
+            wordPoints = ws.Probability >= 0.99 ? s.WordsSpam
+                : ws.Probability >= 0.90 ? s.WordsLikelySpam
+                : ws.Probability <= 0.10 ? s.WordsHam
+                : 0;
+            var clues = wordPoints > 0 ? ws.SpamClues : ws.HamClues;
+            Add(wordPoints, $"words {ws.Probability * 100:0}% junk" +
+                            (clues.Count > 0 ? ": " + string.Join(", ", clues.Select(c => $"\"{Clip(c)}\"")) : ""));
+        }
+
         // ---- things people need -----------------------------------------------------------
         if (FirstMatch(Rules.Transactional.Regexes, subject) is { } tm)
             Add(Rules.Transactional.Weight, $"transactional \"{Clip(tm)}\"");
 
         bool junk = score >= Rules.Threshold;
-        var category = bestCategory.Length > 0 ? bestCategory : bulk ? "Bulk mail" : "Other";
-        return new Verdict(junk, score, category, junk ? "score" : "below threshold", reasons);
+        var category = bestCategory.Length > 0 ? bestCategory
+            : wordPoints > 0 && score - wordPoints < Rules.Threshold ? "Words"
+            : bulk ? "Bulk mail" : "Other";
+        return new Verdict(junk, score, category, junk ? "score" : "below threshold", reasons, wordPoints);
 
         Verdict Keep(string why) => new(false, 0, "", why, [why]);
     }

@@ -10,7 +10,8 @@ namespace Gplus;
 
 public sealed record SweepOptions(bool Apply, bool UseSeen, int? Max = null, string? Query = null);
 
-public sealed record SweepResult(int Listed, int Examined, int Junk, int Removed, int Trained = 0, int Restored = 0);
+public sealed record SweepResult(int Listed, int Examined, int Junk, int Removed, int Trained = 0, int Restored = 0,
+    int WordsLearned = 0, int WordsSpam = 0, int WordsHam = 0, bool WordsActive = false);
 
 /// <summary>One pass over the inbox: list candidates → fetch → classify → act → log.</summary>
 public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweeper> logger) : IDisposable
@@ -26,6 +27,7 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
     private readonly SeenStore _seen = new(AppPaths.Seen);
     private readonly CorrespondentStore _correspondents = new(AppPaths.Correspondents, logger);
     private readonly DecisionLog _decisions = new(AppPaths.LogDir, options.CurrentValue.LogRetentionDays);
+    private readonly WordFilter _words = WordFilter.Load(AppPaths.Words);
 
     /// <summary>Raised for every judged message (the console "scan" command prints these).</summary>
     public event Action<MailItem, Verdict, string>? Judged;
@@ -54,23 +56,29 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
 
         var myAddresses = new HashSet<string>(_myAddresses);
         foreach (var a in opt.MyAddresses.Where(a => a.Contains('@'))) myAddresses.Add(Addresses.Normalize(a));
-        var ctx = new ClassifyContext
-        {
-            MyAddresses = myAddresses,
-            MyDomains = opt.MyAddresses.Where(a => !a.Contains('@')).Select(a => a.Trim().TrimStart('@', '*', '.')).ToList(),
-            Correspondents = opt.LearnCorrespondents ? _correspondents.Addresses : new HashSet<string>(),
-        };
+        var myDomains = opt.MyAddresses.Where(a => !a.Contains('@')).Select(a => a.Trim().TrimStart('@', '*', '.')).ToList();
+        var correspondents = opt.LearnCorrespondents ? _correspondents.Addresses : new HashSet<string>();
+        var ctx = new ClassifyContext { MyAddresses = myAddresses, MyDomains = myDomains, Correspondents = correspondents };
 
         // Training first, so what it learns applies to this sweep (a rules change re-judges recent mail).
-        int trained = 0, restored = 0;
+        int trained = 0, restored = 0, wordsLearned = 0;
         if (run.Apply && opt.LearnFromLabels)
         {
             (trained, restored) = await TrainAsync(opt, ctx, classifier, ct);
+            if (trained + restored > 0) _words.Save(AppPaths.Words);
             classifier = LoadRules();
         }
+        if (run.Apply && opt.WordFilter)
+        {
+            wordsLearned = await HarvestWordsAsync(opt, ct);
+            if (wordsLearned > 0) _words.Save(AppPaths.Words);
+        }
+        if (opt.WordFilter && _words.IsReady(opt.WordFilterMinSpam, opt.WordFilterMinHam))
+            ctx = new ClassifyContext { MyAddresses = myAddresses, MyDomains = myDomains, Correspondents = correspondents, Words = _words };
 
         var ids = await ListAsync(run.Query ?? opt.Query, run.Max ?? opt.MaxPerPass, ct);
         int examined = 0, junk = 0, removed = 0;
+        bool wordsOnly = false;
 
         foreach (var id in ids)
         {
@@ -103,6 +111,12 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
                 {
                     await RemoveAsync(item.Id, opt, ct);
                     removed++;
+                    // Removed only thanks to the word filter: don't feed it back in as a junk example.
+                    if (verdict.WordPoints > 0 && verdict.Score - verdict.WordPoints < classifier.Rules.Threshold)
+                    {
+                        _words.MarkNoHarvest(item.Id);
+                        wordsOnly = true;
+                    }
                     action = "REMOVED:" + opt.Action.ToString().ToUpperInvariant();
                     logger.LogInformation("Removed [{Category} {Score}] {From} — {Subject}",
                         verdict.Category, verdict.Score, item.FromAddress, item.Subject);
@@ -120,7 +134,9 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
         }
 
         if (run.UseSeen) _seen.Save();
-        return new SweepResult(ids.Count, examined, junk, removed, trained, restored);
+        if (wordsOnly) _words.Save(AppPaths.Words);
+        return new SweepResult(ids.Count, examined, junk, removed, trained, restored, wordsLearned,
+            _words.SpamCount, _words.HamCount, ctx.Words is not null);
     }
 
     public void PruneLogs() => _decisions.Prune();
@@ -220,7 +236,8 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
         foreach (var id in trainIds)
         {
             ct.ThrowIfCancellationRequested();
-            if (await GetSummaryAsync(id, ct) is not { } m) continue;
+            if (await GetFullAsync(id, ct) is not { } m) continue;
+            _words.Train(m, spam: true);
 
             bool changed = learned.RemoveAllowsMatching(m.FromAddress).Count > 0;
             var entry = SenderLearner.BlockEntryFor(m.FromAddress, classifier.Rules, _handAllow, ctx, out var why);
@@ -239,7 +256,8 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
         foreach (var id in notJunkIds)
         {
             ct.ThrowIfCancellationRequested();
-            if (await GetSummaryAsync(id, ct) is not { } m) continue;
+            if (await GetFullAsync(id, ct) is not { } m) continue;
+            _words.Train(m, spam: false);
 
             var unblocked = learned.RemoveBlocksMatching(m.FromAddress);
             bool allowed = learned.AddAllow(m.FromAddress, $"{m.FromAddress} — {m.Subject}");
@@ -262,6 +280,58 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
         return (trained, restored);
     }
 
+    /// <summary>
+    /// Feeds the word filter examples whose fate is already settled, a few per sweep:
+    /// junk = mail Gplus removed a while ago that you didn't rescue, plus Gmail's Spam folder;
+    /// good = mail you've filed under your own labels or starred. The training labels are
+    /// learned separately (in <see cref="TrainAsync"/>) and always win.
+    /// </summary>
+    private async Task<int> HarvestWordsAsync(GplusOptions opt, CancellationToken ct)
+    {
+        var removed = "label:" + opt.RemovedLabel.Replace(' ', '-');
+        var spamQuery = $"({removed} -in:inbox older_than:{Math.Max(1, opt.WordFilterConfirmDays)}d) OR in:spam";
+        var hamQuery = "(has:userlabels OR is:starred) -in:sent -in:chats -in:drafts -in:spam -in:trash " +
+                       $"-{removed} -label:{opt.TrainLabel.Replace(' ', '-')} -label:{opt.NotJunkLabel.Replace(' ', '-')}";
+
+        int budget = Math.Max(0, opt.WordFilterLearnPerSweep);
+        bool wantSpam = _words.SpamCount < opt.WordFilterMaxPerSide;
+        bool wantHam = _words.HamCount < opt.WordFilterMaxPerSide;
+        int spamBudget = wantSpam && wantHam ? budget / 2 : wantSpam ? budget : 0;
+        int hamBudget = wantHam ? budget - spamBudget : 0;
+
+        int learned = 0;
+        if (spamBudget > 0) learned += await HarvestAsync(spamQuery, spam: true, spamBudget, ct);
+        if (hamBudget > 0) learned += await HarvestAsync(hamQuery, spam: false, hamBudget, ct);
+        return learned;
+    }
+
+    private async Task<int> HarvestAsync(string query, bool spam, int budget, CancellationToken ct)
+    {
+        var ids = new List<string>();
+        string? page = null;
+        int pages = 0;
+        do // newest first; looks back at most 5,000 messages so a fully-learned folder stays cheap
+        {
+            var req = _gmail!.Users.Messages.List("me");
+            req.Q = query;
+            req.IncludeSpamTrash = true;
+            req.MaxResults = 500;
+            req.PageToken = page;
+            var resp = await req.ExecuteAsync(ct);
+            ids.AddRange((resp.Messages ?? []).Select(m => m.Id)
+                .Where(id => _words.TrainedAs(id) is null && !(spam && _words.IsNoHarvest(id))));
+            page = resp.NextPageToken;
+        } while (page is not null && ids.Count < budget && ++pages < 10);
+
+        int learned = 0;
+        foreach (var id in ids.Take(budget))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (await GetFullAsync(id, ct) is { } m && _words.Train(m, spam)) learned++;
+        }
+        return learned;
+    }
+
     private async Task<List<string>> ListLabelAsync(string labelId, CancellationToken ct)
     {
         var req = _gmail!.Users.Messages.List("me");
@@ -272,27 +342,14 @@ public sealed class Sweeper(IOptionsMonitor<GplusOptions> options, ILogger<Sweep
         return resp.Messages?.Select(m => m.Id).ToList() ?? [];
     }
 
-    /// <summary>Just the sender, subject and labels; null if the message is gone.</summary>
-    private async Task<MailItem?> GetSummaryAsync(string id, CancellationToken ct)
+    /// <summary>The whole message; null if it's gone.</summary>
+    private async Task<MailItem?> GetFullAsync(string id, CancellationToken ct)
     {
         var get = _gmail!.Users.Messages.Get("me", id);
-        get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Metadata;
-        get.MetadataHeaders = new Google.Apis.Util.Repeatable<string>(["From", "Subject"]);
+        get.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
         try
         {
-            var msg = await get.ExecuteAsync(ct);
-            string Header(string n) => msg.Payload?.Headers?
-                .FirstOrDefault(h => string.Equals(h.Name, n, StringComparison.OrdinalIgnoreCase))?.Value ?? "";
-            var (name, address) = Addresses.Parse(Header("From"));
-            return new MailItem
-            {
-                Id = msg.Id,
-                ThreadId = msg.ThreadId ?? "",
-                FromName = name,
-                FromAddress = address,
-                Subject = Header("Subject"),
-                Labels = msg.LabelIds?.ToList() ?? [],
-            };
+            return GmailMapper.Map(await get.ExecuteAsync(ct));
         }
         catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
         {

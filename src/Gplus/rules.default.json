@@ -42,7 +42,12 @@
     "PreheaderPadding": 1,
     "ShoutySubject": 1,
     "ManyLinks": 1,
-    "ImageOnly": 1
+    "ImageOnly": 1,
+    // The learned word-and-phrase filter (see README): points when it's 99%+ sure of junk,
+    // 90-99% sure, or 10% or less (protective). It switches on once it has enough examples.
+    "WordsSpam": 5,
+    "WordsLikelySpam": 3,
+    "WordsHam": -3
   },
 
   // A sender whose display name IS one of these brands but whose domain is not in the list is

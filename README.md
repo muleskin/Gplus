@@ -79,6 +79,7 @@ service there (quoted path), starts it, and logs to `%ProgramData%\Gplus\logs\de
 |---|---|
 | `rules.json` | Your rules. **Edit freely**; the next sweep reloads them, no restart needed. A broken edit is logged and the previous rules keep running. |
 | `learned.json` | Senders learned from the training labels (see below). Delete an entry to undo it. |
+| `words.json` | The word filter's memory (see below). Safe to delete; it relearns. |
 | `appsettings.json` *(optional)* | Overrides for the settings below |
 | `logs\decisions-YYYY-MM-DD.tsv` | One line per judged message. Opens in Excel. |
 | `logs\gplus-YYYY-MM-DD.log` | Service activity |
@@ -97,6 +98,10 @@ service there (quoted path), starts it, and logs to `%ProgramData%\Gplus\logs\de
 | `LearnCorrespondents` | `true` | Protect everyone you've emailed |
 | `LearnFromLabels` | `true` | Learn from the `Gplus-Train` and `Gplus-NotJunk` labels |
 | `TrainLabel` / `NotJunkLabel` | `Gplus-Train` / `Gplus-NotJunk` | Names of those labels |
+| `WordFilter` | `true` | Learn words and phrases and score mail with them |
+| `WordFilterMinSpam` / `WordFilterMinHam` | `30` / `30` | Examples needed before it starts scoring |
+| `WordFilterLearnPerSweep` | `40` | Examples gathered automatically per sweep |
+| `WordFilterConfirmDays` | `2` | Days removed mail must go unrescued to count as junk |
 
 ### Teaching Gplus from Gmail
 
@@ -116,9 +121,48 @@ on your phone or the web):
   Spam. Gplus allows that address, removes any learned block that caught it, and moves the
   message back to your inbox.
 
+Both labels also train the word filter (below).
+
 What it learns goes in `learned.json`, never in your hand-edited `rules.json`. Every lesson is
 also written to the decisions log (`Action` starts with `TRAINED` or is `RESTORED`). The labels
 are ignored while `DryRun` is on, and by `scan` without `--apply`.
+
+### Word and phrase filter
+
+Besides its rules, Gplus learns which words and two-word phrases show up in your junk versus
+your good mail. It works like a classic spam filter (the statistics used by SpamBayes and
+Thunderbird). It catches junk that no rule mentions, like a new "reverse mortgage" sender, once
+it has seen similar messages.
+
+**What it learns from** (a few dozen messages per sweep, all read-only):
+
+| Junk | Good |
+|---|---|
+| Messages you put in `Gplus-Train` | Messages you put in `Gplus-NotJunk` |
+| Mail Gplus removed at least `WordFilterConfirmDays` (2) days ago that you didn't rescue | Mail you've filed under your own labels, or starred |
+| Gmail's Spam folder | |
+
+The training labels always win: moving a message to the other label re-files it on the other
+side. Mail removed *only* because of the word filter is never fed back in as junk, so the filter
+can't keep reinforcing its own mistakes.
+
+**How it scores.** It stays off until it has `WordFilterMinSpam` (30) junk and `WordFilterMinHam`
+(30) good examples. After that, each new message gets a junk probability, and that adds points
+like any other signal (weights under `Signals` in `rules.json`):
+
+| Word filter says | Points |
+|---|---|
+| 99%+ junk | `WordsSpam` (+5) |
+| 90–99% junk | `WordsLikelySpam` (+3) |
+| 10% or less junk | `WordsHam` (−3) |
+
+On its own it never quite reaches the threshold of 6; it needs one other sign, like a
+List-Unsubscribe header. It also never overrides the allow list, starred mail or people you've
+emailed. The decision log shows its reasoning, for example
+`+5 words 100% junk: "reverse mortgage", "home equity", "tax-free cash"`.
+
+`Gplus.exe words` shows how many examples it has and the words and phrases it finds most telling.
+Its memory is `words.json`. Delete that file to start over; it relearns from Gmail.
 
 ### Tuning rules
 
