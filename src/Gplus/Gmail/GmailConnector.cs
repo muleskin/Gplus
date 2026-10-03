@@ -35,7 +35,10 @@ public static class GmailConnector
         {
             // Validate before copying so a wrong file doesn't overwrite a good one.
             using (var s = File.OpenRead(clientSecretPath)) _ = GoogleClientSecrets.FromStream(s).Secrets;
-            File.Copy(Path.GetFullPath(clientSecretPath), AppPaths.ClientSecret, overwrite: true);
+            var source = Path.GetFullPath(clientSecretPath);
+            // Pointing at the copy Gplus already keeps is fine — there's nothing to copy.
+            if (!string.Equals(source, Path.GetFullPath(AppPaths.ClientSecret), StringComparison.OrdinalIgnoreCase))
+                File.Copy(source, AppPaths.ClientSecret, overwrite: true);
         }
 
         var store = new DpapiDataStore(AppPaths.TokenDir);
