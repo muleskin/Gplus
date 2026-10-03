@@ -21,6 +21,7 @@ try
         "scan" => await Scan(rest),
         "test" => Test(rest),
         "words" => Words(rest),
+        "test-alert" => TestAlert(),
         "install" => ServiceInstaller.Install(),
         "uninstall" => ServiceInstaller.Uninstall(),
         "start" => ServiceInstaller.Start(),
@@ -61,6 +62,7 @@ static HostApplicationBuilder CreateBuilder(bool console)
     builder.Configuration.AddJsonFile(AppPaths.UserSettings, optional: true, reloadOnChange: true);
     builder.Services.Configure<GplusOptions>(builder.Configuration.GetSection("Gplus"));
     builder.Services.AddSingleton<Sweeper>();
+    builder.Services.AddSingleton<AuthAlert>();
 
     builder.Logging.AddProvider(new FileLoggerProvider(AppPaths.LogDir));
     if (console)
@@ -198,6 +200,14 @@ static int Words(string[] a)
     }
 }
 
+static int TestAlert()
+{
+    var shown = AuthAlert.Show("TEST — this is what the alert looks like.\n\n" +
+        AuthAlert.Message("Google rejected the saved login (revoked or expired).", DateTime.Now));
+    Console.WriteLine(shown ? "Alert shown on the desktop." : "No one is signed in at the console, so nothing was shown.");
+    return shown ? 0 : 1;
+}
+
 static int Help(int rc = 0)
 {
     Console.WriteLine("""
@@ -208,6 +218,7 @@ static int Help(int rc = 0)
                                                  Preview (or with --apply, act on) unread inbox mail now
           Gplus test <messages.json> [rules.json] Classify sample messages offline, for tuning rules
           Gplus words [--top N]                  Show what the word filter has learned
+          Gplus test-alert                       Show the 'Gmail login needed' desktop alert
           Gplus install | uninstall | start | stop | status
                                                  Manage the Windows service (elevated prompt)
 

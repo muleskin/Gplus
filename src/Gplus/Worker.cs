@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 namespace Gplus;
 
 /// <summary>The service loop: sweep, sleep, repeat — surviving network blips and missing auth.</summary>
-public sealed class Worker(Sweeper sweeper, IOptionsMonitor<GplusOptions> options, ILogger<Worker> logger) : BackgroundService
+public sealed class Worker(Sweeper sweeper, AuthAlert authAlert, IOptionsMonitor<GplusOptions> options, ILogger<Worker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -33,6 +33,7 @@ public sealed class Worker(Sweeper sweeper, IOptionsMonitor<GplusOptions> option
                         r.WordsLearned, r.WordsSpam, r.WordsHam,
                         r.WordsActive ? "scoring" : $"starts scoring at {opt.WordFilterMinSpam} / {opt.WordFilterMinHam}");
                 failures = 0;
+                authAlert.LoginOk();
                 wait = TimeSpan.FromSeconds(Math.Max(30, opt.PollIntervalSeconds));
 
                 if (DateTime.Now - lastPrune > TimeSpan.FromDays(1))
@@ -48,12 +49,14 @@ public sealed class Worker(Sweeper sweeper, IOptionsMonitor<GplusOptions> option
             catch (NotAuthorizedException ex)
             {
                 logger.LogError("{Message}", ex.Message);
+                authAlert.LoginFailed(opt, "Gplus has no saved Gmail login.");
                 sweeper.Reset();
                 wait = TimeSpan.FromMinutes(5);
             }
             catch (TokenResponseException ex) when (ex.Error?.Error == "invalid_grant")
             {
                 logger.LogError("Google rejected the saved login (revoked or expired). Run \"Gplus authorize\" again.");
+                authAlert.LoginFailed(opt, "Google rejected the saved login (revoked or expired).");
                 sweeper.Reset();
                 wait = TimeSpan.FromMinutes(15);
             }

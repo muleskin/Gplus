@@ -69,6 +69,12 @@ public sealed class GplusOptions
     /// <summary>Cap on sent messages read the first time the correspondent list is built.</summary>
     public int CorrespondentScanMax { get; set; } = 2000;
 
+    /// <summary>Pop up a desktop message when Gmail rejects the saved login (the service can't sweep until you re-authorize).</summary>
+    public bool AuthAlert { get; set; } = true;
+
+    /// <summary>Hours between repeat alerts while the login stays broken.</summary>
+    public int AuthAlertRepeatHours { get; set; } = 12;
+
     /// <summary>Days of decision logs to keep.</summary>
     public int LogRetentionDays { get; set; } = 60;
 }
