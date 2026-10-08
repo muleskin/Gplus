@@ -1,0 +1,1 @@
+{ "name": "gplus-guide", "private": true, "dependencies": { "docx": "^9.8.1", "jszip": "^3.10.1" } }
